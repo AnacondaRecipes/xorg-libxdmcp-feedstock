@@ -34,9 +34,21 @@ if [ -n "$CYGWIN_PREFIX" ] ; then
 
     # And we need to add the search path that lets libtool find the
     # msys2 stub libraries for ws2_32.
-    platlibs=$(cd $(dirname $($CC --print-prog-name=ld))/../sysroot/usr/lib && pwd -W)
-    test -f $platlibs/libws2_32.a || { echo "error locating libws2_32" ; exit 1 ; }
-    export LDFLAGS="$LDFLAGS -L$platlibs"
+    for potential_path in "$BUILD_PREFIX_M/Library/mingw-w64/lib" "$mprefix/mingw-w64/lib"; do
+        if [ -e "$potential_path/libws2_32.a" ]; then
+            platlibs=$(cygpath -w "$potential_path")
+            echo "Found msys2 libs at: $platlibs"
+            export LDFLAGS="$LDFLAGS -L$platlibs"
+            break
+        fi
+    done
+    
+    if [ -z "$platlibs" ]; then
+        echo "Warning: Could not locate libws2_32.a, using default path"
+        default_path="$BUILD_PREFIX_M/Library/mingw-w64/lib"
+        platlibs=$(cygpath -w "$default_path")
+        export LDFLAGS="$LDFLAGS -L$platlibs"
+    fi
 else
     # for other platforms we just need to reconf to get the correct achitecture
     echo libtoolize
