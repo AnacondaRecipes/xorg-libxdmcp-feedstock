@@ -47,12 +47,14 @@ if [ -n "$CYGWIN_PREFIX" ] ; then
         fi
     done
 
-    if [ -n "$platlibs" ]; then
+    if [ -f "$platlibs/libws2_32.a" ]; then
         export LDFLAGS="$LDFLAGS -L$platlibs"
-        echo "Found Windows libraries at: $platlibs"
     else
-        echo "Warning: Could not find Windows system libraries"
+        echo "Warning: Could not find libws2_32.a"
     fi
+    export DLLTOOL=x86_64-w64-mingw32-dlltool.exe
+    export NM=x86_64-w64-mingw32-nm.exe
+    export OBJDUMP=x86_64-w64-mingw32-objdump.exe
 
     # Check for winpthread in standard locations
     for lib in libwinpthread libpthread_win32 libpthread; do
