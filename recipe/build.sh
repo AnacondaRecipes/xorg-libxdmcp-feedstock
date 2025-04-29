@@ -31,26 +31,37 @@ if [ -n "$CYGWIN_PREFIX" ] ; then
     )
     autoreconf "${autoreconf_args[@]}"
 
+    export CC="gcc"
+
     # Look in standard mingw-w64 library locations
-    for lib_path in "$BUILD_PREFIX_M/Library/mingw-w64/bin" "$BUILD_PREFIX_M/Library/bin" "$mprefix/Library/mingw-w64/lib" "$mprefix/Library/lib"; do
-        if [ -d "$lib_path" ]; then
-            # Convert to Windows path
-            win_path=$(cygpath -w "$lib_path")
-            echo "Adding path to library search: $win_path"
-            export PATH="$PATH:$win_path"
-            export LIBRARY_PATH="$LIBRARY_PATH:$win_path"
-            # For ld
-            export LDFLAGS="$LDFLAGS -L$win_path"
+    # Find MSYS2 libraries directory using a more reliable approach
+    platlibs=""
+    for potential_path in \
+        "$(dirname $($CC --print-prog-name=ld))/../sysroot/usr/lib" \
+        "$(dirname $($CC --print-prog-name=ld))/../x86_64-w64-mingw32/lib" \
+        "$BUILD_PREFIX_M/Library/mingw-w64/lib" \
+        "$BUILD_PREFIX_M/Library/usr/lib" \
+        "$BUILD_PREFIX_M/Library/x86_64-w64-mingw32/sysroot/usr/lib"; do
+        if [ -f "$(cygpath -u "$potential_path")/libws2_32.a" ]; then
+            platlibs=$(cygpath -u "$potential_path")
+            break
         fi
     done
-    
-    # Explicitly add the Windows socket library to LIBS
-    export LIBS="$LIBS -lws2_32"
-    
-    # Skip tests on Windows
-    export do_check=no
+
+    # Check for winpthread in standard locations
+    for lib in libwinpthread libpthread_win32 libpthread; do
+        if [ -f "$BUILD_PREFIX_M/Library/lib/${lib}.a" ] || [ -f "$BUILD_PREFIX_M/Library/lib/${lib}.dll.a" ]; then
+        export PTHREAD_LIBS="-l${lib#lib}"
+        break
+        fi
+    done
+
+    if [ -f "$platlibs/libws2_32.a" ]; then
+        export LDFLAGS="$LDFLAGS -L$platlibs"
+    else
+        echo "Warning: Could not find libws2_32.a"
+    fi
 else
-    export do_check=yes
     # for other platforms we just need to reconf to get the correct achitecture
     echo libtoolize
     libtoolize
