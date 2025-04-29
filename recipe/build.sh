@@ -34,7 +34,6 @@ if [ -n "$CYGWIN_PREFIX" ] ; then
     export CC="gcc"
 
     # Look in standard mingw-w64 library locations
-    # Find MSYS2 libraries directory using a more reliable approach
     platlibs=""
     for potential_path in \
         "$(dirname $($CC --print-prog-name=ld))/../sysroot/usr/lib" \
@@ -48,6 +47,13 @@ if [ -n "$CYGWIN_PREFIX" ] ; then
         fi
     done
 
+    if [ -n "$platlibs" ]; then
+        export LDFLAGS="$LDFLAGS -L$platlibs"
+        echo "Found Windows libraries at: $platlibs"
+    else
+        echo "Warning: Could not find Windows system libraries"
+    fi
+
     # Check for winpthread in standard locations
     for lib in libwinpthread libpthread_win32 libpthread; do
         if [ -f "$BUILD_PREFIX_M/Library/lib/${lib}.a" ] || [ -f "$BUILD_PREFIX_M/Library/lib/${lib}.dll.a" ]; then
@@ -55,12 +61,6 @@ if [ -n "$CYGWIN_PREFIX" ] ; then
         break
         fi
     done
-
-    if [ -f "$platlibs/libws2_32.a" ]; then
-        export LDFLAGS="$LDFLAGS -L$platlibs"
-    else
-        echo "Warning: Could not find libws2_32.a"
-    fi
 else
     # for other platforms we just need to reconf to get the correct achitecture
     echo libtoolize
