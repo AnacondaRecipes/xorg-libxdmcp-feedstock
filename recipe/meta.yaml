@@ -42,6 +42,7 @@ requirements:
 
 test:
   commands:
+    - echo on  # [win]
     - test -f $PREFIX/include/X11/Xdmcp.h  # [unix]
     - test -f $PREFIX/lib/libXdmcp.dylib   # [osx]
     - test -f $PREFIX/lib/libXdmcp.so      # [linux]
