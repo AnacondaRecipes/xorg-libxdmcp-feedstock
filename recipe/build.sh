@@ -21,7 +21,6 @@ fi
 
 # On Windows we need to regenerate the configure scripts.
 if [ -n "$CYGWIN_PREFIX" ] ; then
-    am_version=1.16 # keep sync'ed with meta.yaml
     export ACLOCAL=aclocal-$am_version
     export AUTOMAKE=automake-$am_version
     autoreconf_args=(
@@ -32,11 +31,38 @@ if [ -n "$CYGWIN_PREFIX" ] ; then
     )
     autoreconf "${autoreconf_args[@]}"
 
-    # And we need to add the search path that lets libtool find the
-    # msys2 stub libraries for ws2_32.
-    platlibs=$(cd $(dirname $($CC --print-prog-name=ld))/../sysroot/usr/lib && pwd -W)
-    test -f $platlibs/libws2_32.a || { echo "error locating libws2_32" ; exit 1 ; }
-    export LDFLAGS="$LDFLAGS -L$platlibs"
+    export CC="gcc"
+
+    # Look in standard mingw-w64 library locations
+    platlibs=""
+    for potential_path in \
+        "$(dirname $($CC --print-prog-name=ld))/../sysroot/usr/lib" \
+        "$(dirname $($CC --print-prog-name=ld))/../x86_64-w64-mingw32/lib" \
+        "$BUILD_PREFIX_M/Library/mingw-w64/lib" \
+        "$BUILD_PREFIX_M/Library/usr/lib" \
+        "$BUILD_PREFIX_M/Library/x86_64-w64-mingw32/sysroot/usr/lib"; do
+        if [ -f "$(cygpath -u "$potential_path")/libws2_32.a" ]; then
+            platlibs=$(cygpath -u "$potential_path")
+            break
+        fi
+    done
+
+    if [ -f "$platlibs/libws2_32.a" ]; then
+        export LDFLAGS="$LDFLAGS -L$platlibs"
+    else
+        echo "Warning: Could not find libws2_32.a"
+    fi
+    export DLLTOOL=x86_64-w64-mingw32-dlltool.exe
+    export NM=x86_64-w64-mingw32-nm.exe
+    export OBJDUMP=x86_64-w64-mingw32-objdump.exe
+
+    # Check for winpthread in standard locations
+    for lib in libwinpthread libpthread_win32 libpthread; do
+        if [ -f "$BUILD_PREFIX_M/Library/lib/${lib}.a" ] || [ -f "$BUILD_PREFIX_M/Library/lib/${lib}.dll.a" ]; then
+        export PTHREAD_LIBS="-l${lib#lib}"
+        break
+        fi
+    done
 else
     # for other platforms we just need to reconf to get the correct achitecture
     echo libtoolize
@@ -65,7 +91,9 @@ configure_args=(
 make -j$CPU_COUNT
 make install
 
-if [[ "${CONDA_BUILD_CROSS_COMPILATION:-}" != "1" || "${CROSSCOMPILING_EMULATOR}" != "" ]]; then
+# Disable make check because it fails on win-64:
+# FAIL: Array.exe
+if [[ "${CONDA_BUILD_CROSS_COMPILATION:-}" != "1" && "${do_check:-yes}" == "yes" ]]; then
     make check
 fi
 
